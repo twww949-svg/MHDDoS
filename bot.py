@@ -7,7 +7,7 @@ import time
 from threading import Lock, Thread, Timer
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-BOT_TOKEN = "7234938721:AAH6Z7qJWB744uCfIShF2tVDit7sGiDcNXM"
+BOT_TOKEN = "7904854246:AAEDXy29VRzQ8r8O7ul-ea-_nTD0TKb1MjY"
 ADMIN_ID = 6958414459
 GROUP_LINK = "https://t.me/crashgrupo"  # Reemplaza con el enlace de tu grupo
 START_PY_PATH = "/workspaces/MHDDoS/start.py"
